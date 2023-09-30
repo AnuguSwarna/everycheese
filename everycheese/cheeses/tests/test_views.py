@@ -1,3 +1,4 @@
+from .factories import CheeseFactory, cheese
 import pytest
 from .factories import UserFactory
 from pytest_django.asserts import assertContains
@@ -5,9 +6,12 @@ from django.urls import reverse
 from .factories import CheeseFactory
 from ..models import Cheese
 from ..views import (
-    CheeseListView,
-    CheeseDetailView
-    )
+CheeseCreateView,
+CheeseListView,
+CheeseDetailView,
+CheeseUpdateView
+)
+
 @pytest.fixture
 def user():
     return UserFactory()
@@ -36,9 +40,8 @@ def test_good_cheese_list_view(rf):
     response = CheeseListView.as_view()(request)
     # Test that the response is valid
     assertContains(response, 'Cheese List')
-def test_good_cheese_detail_view(rf):
-    # Order some cheese from the CheeseFactory
-    cheese = CheeseFactory()
+def test_good_cheese_detail_view(rf, cheese):
+
     # Make a request for our new cheese
     url = reverse("cheeses:detail",
     kwargs={'slug': cheese.slug})
@@ -69,8 +72,7 @@ def test_cheese_list_contains_2_cheeses(rf):
     # in the template.
     assertContains(response, cheese1.name)
     assertContains(response, cheese2.name)
-def test_detail_contains_cheese_data(rf):
-    cheese = CheeseFactory()
+def test_detail_contains_cheese_data(rf,cheese):
     # Make a request for our new cheese
     url = reverse("cheeses:detail",
     kwargs={'slug': cheese.slug})
@@ -101,3 +103,39 @@ def test_cheese_create_form_valid(client, user):
     assert cheese.description == "A salty hard cheese"
     assert cheese.firmness == Cheese.Firmness.HARD
     assert cheese.creator == user
+def test_cheese_create_correct_title(client, user):
+    """Page title for CheeseCreateView should be Add Cheese."""
+    # Authenticate the user
+    client.force_login(user)
+    # Call the cheese add view
+    response = client.get(reverse("cheeses:add"))
+    # Confirm that 'Add Cheese' is in the rendered HTML
+    assertContains(response, "Add Cheese")
+def test_good_cheese_update_view(client, user, cheese):
+    # Authenticate the user
+    client.force_login(user)
+    # Get the URL
+    url = reverse("cheeses:update",
+    kwargs={"slug": cheese.slug})
+    # Fetch the GET request for our new cheese
+    response = client.get(url)
+    # Test that the response is valid
+    assertContains(response, "Update Cheese")
+def test_cheese_update(client, user, cheese):
+    """POST request to CheeseUpdateView updates a cheese
+    and redirects.
+    """
+    # Authenticate the user
+    client.force_login(user)
+    # Make a request for our new cheese
+    form_data = {
+    "name": cheese.name,
+    "description": "Something new",
+    "firmness": cheese.firmness,
+    }
+    url = reverse("cheeses:update",
+    kwargs={"slug": cheese.slug})
+    response = client.post(url, form_data)
+    # Check that the cheese has been changed
+    cheese.refresh_from_db()
+    assert cheese.description == "Something new"
